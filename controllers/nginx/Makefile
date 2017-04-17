@@ -3,10 +3,10 @@ all: push
 BUILDTAGS=
 
 # Use the 0.0 tag for testing, it shouldn't clobber any release builds
-RELEASE?=0.9.0-beta.3
-PREFIX?=gcr.io/google_containers/nginx-ingress-controller
+RELEASE?=0.1.0-beta.2
+PREFIX?=cargo.caicloud.io/caicloud/nginx-ingress-controller
 GOOS?=linux
-DOCKER?=gcloud docker --
+DOCKER?=docker
 
 REPO_INFO=$(shell git config --get remote.origin.url)
 
