@@ -22,8 +22,14 @@ import (
 	"github.com/golang/glog"
 	"github.com/imdario/mergo"
 
+	clientset "k8s.io/client-go/kubernetes"
+	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/ingress/core/pkg/ingress"
+	"k8s.io/ingress/core/pkg/k8s"
 )
+
+// ingressLoadbalancerAnno is the name of load balancer
+const ingressLoadbalancerAnno = "ingress.alpha.k8s.io/loadbalancer-name"
 
 // DeniedKeyName name of the key that contains the reason to deny a location
 const DeniedKeyName = "Denied"
@@ -52,6 +58,19 @@ func isHostValid(host string, cert *ingress.SSLCert) bool {
 	}
 
 	return false
+}
+
+func isAssignedToSelf(ing *extensions.Ingress, client clientset.Interface) bool {
+	if ing.Annotations == nil {
+		return false
+	}
+
+	podInfo, err := k8s.GetPodDetails(client)
+	if err != nil {
+		glog.Fatalf("unexpected error obtaining pod information: %v", err)
+	}
+
+	return strings.HasPrefix(podInfo.Name, ing.Annotations[ingressLoadbalancerAnno])
 }
 
 func matchHostnames(pattern, host string) bool {

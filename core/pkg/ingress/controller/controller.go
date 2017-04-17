@@ -165,6 +165,11 @@ func newIngressController(config *Configuration) *GenericController {
 	ingEventHandler := cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			addIng := obj.(*extensions.Ingress)
+			// ignore ingresses which not belong to current controller
+			if !isAssignedToSelf(addIng, ic.cfg.Client) {
+				glog.Infof("Ignoring add for ingress %v based on annotation %v", addIng.Name, ingressLoadbalancerAnno)
+				return
+			}
 			if !class.IsValid(addIng, ic.cfg.IngressClass, ic.cfg.DefaultIngressClass) {
 				glog.Infof("ignoring add for ingress %v based on annotation %v", addIng.Name, class.IngressKey)
 				return
@@ -175,6 +180,11 @@ func newIngressController(config *Configuration) *GenericController {
 		},
 		DeleteFunc: func(obj interface{}) {
 			delIng := obj.(*extensions.Ingress)
+			// ignore ingresses which not belong to current controller
+			if !isAssignedToSelf(delIng, ic.cfg.Client) {
+				glog.Infof("Ignoring delete for ingress %v based on annotation %v", delIng.Name, ingressLoadbalancerAnno)
+				return
+			}
 			if !class.IsValid(delIng, ic.cfg.IngressClass, ic.cfg.DefaultIngressClass) {
 				glog.Infof("ignoring delete for ingress %v based on annotation %v", delIng.Name, class.IngressKey)
 				return
@@ -185,6 +195,11 @@ func newIngressController(config *Configuration) *GenericController {
 		UpdateFunc: func(old, cur interface{}) {
 			oldIng := old.(*extensions.Ingress)
 			curIng := cur.(*extensions.Ingress)
+			// ignore ingresses which not belong to current controller
+			if !isAssignedToSelf(curIng, ic.cfg.Client) {
+				glog.Infof("Ignoring update for ingress %v based on annotation %v", curIng.Name, ingressLoadbalancerAnno)
+				return
+			}
 			if !class.IsValid(curIng, ic.cfg.IngressClass, ic.cfg.DefaultIngressClass) &&
 				!class.IsValid(oldIng, ic.cfg.IngressClass, ic.cfg.DefaultIngressClass) {
 				return
@@ -553,19 +568,30 @@ func (c ingressByRevision) Less(i, j int) bool {
 // getBackendServers returns a list of Upstream and Server to be used by the backend
 // An upstream can be used in multiple servers if the namespace, service name and port are the same
 func (ic *GenericController) getBackendServers() ([]*ingress.Backend, []*ingress.Server) {
-	ings := ic.ingLister.Store.List()
-	sort.Sort(ingressByRevision(ings))
+	allIngs := ic.ingLister.Store.List()
 
+	// ignore ingresses which not belong to current controller
+	ings := []interface{}{}
+	for _, ingIf := range allIngs {
+		ing := ingIf.(*extensions.Ingress)
+
+		if !isAssignedToSelf(ing, ic.cfg.Client) {
+			continue
+		}
+
+		if !class.IsValid(ing, ic.cfg.IngressClass, ic.cfg.DefaultIngressClass) {
+			continue
+		}
+		glog.Infof("valid ingress: %s/%s", ing.Namespace, ing.Name)
+		ings = append(ings, ingIf)
+	}
+
+	sort.Sort(ingressByRevision(ings))
 	upstreams := ic.createUpstreams(ings)
 	servers := ic.createServers(ings, upstreams)
 
 	for _, ingIf := range ings {
 		ing := ingIf.(*extensions.Ingress)
-
-		if !class.IsValid(ing, ic.cfg.IngressClass, ic.cfg.DefaultIngressClass) {
-			continue
-		}
-
 		anns := ic.annotations.Extract(ing)
 
 		for _, rule := range ing.Spec.Rules {

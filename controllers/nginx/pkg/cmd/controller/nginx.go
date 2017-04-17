@@ -446,9 +446,9 @@ func (n *NGINXController) OnUpdate(ingressCfg ingress.Configuration) ([]byte, er
 		return nil, err
 	}
 
-	if err := n.testTemplate(content); err != nil {
-		return nil, err
-	}
+	// if err := n.testTemplate(content); err != nil {
+	//     return nil, err
+	// }
 
 	return content, nil
 }

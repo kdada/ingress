@@ -22,7 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"os/exec"
+	"regexp"
 	"strings"
 	text_template "text/template"
 
@@ -76,6 +76,8 @@ func (t *Template) Close() {
 	t.fw.Close()
 }
 
+var deleteEmptyLine = regexp.MustCompile(`\n\s*\n`)
+
 // Write populates a buffer using a template with NGINX configuration
 // and the servers and upstreams created by Ingress rules
 func (t *Template) Write(conf config.TemplateConfig) ([]byte, error) {
@@ -104,17 +106,18 @@ func (t *Template) Write(conf config.TemplateConfig) ([]byte, error) {
 		return nil, err
 	}
 
+	return deleteEmptyLine.ReplaceAll(t.tmplBuf.Bytes(), []byte{'\n'}), nil
 	// squeezes multiple adjacent empty lines to be single
 	// spaced this is to avoid the use of regular expressions
-	cmd := exec.Command("/ingress-controller/clean-nginx-conf.sh")
-	cmd.Stdin = t.tmplBuf
-	cmd.Stdout = t.outCmdBuf
-	if err := cmd.Run(); err != nil {
-		glog.Warningf("unexpected error cleaning template: %v", err)
-		return t.tmplBuf.Bytes(), nil
-	}
+	// cmd := exec.Command("/ingress-controller/clean-nginx-conf.sh")
+	// cmd.Stdin = t.tmplBuf
+	// cmd.Stdout = t.outCmdBuf
+	// if err := cmd.Run(); err != nil {
+	//     glog.Warningf("unexpected error cleaning template: %v", err)
+	//     return t.tmplBuf.Bytes(), nil
+	// }
 
-	return t.outCmdBuf.Bytes(), nil
+	// return t.outCmdBuf.Bytes(), nil
 }
 
 var (
